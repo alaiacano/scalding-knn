@@ -12,8 +12,8 @@ class KnnExampleJob(args: Args) extends Job(args) {
   val iris = Tsv("iris.tsv", ('id, 'class, 'sepalLength, 'sepalWidth, 'petalLength, 'petalWidth))
     .read
     // Just use 2 of the features so we can visualize them easier. Need to convert them to Points
-    .map(('sepalLength, 'sepalWidth) -> 'point) {tup: (Double, Double) => Point(tup._1, tup._2)}
-    .project('id, 'class, 'point)
+    .map(('sepalLength, 'sepalWidth) -> 'features) {tup: (Double, Double) => Point(tup._1, tup._2)}
+    .project('id, 'class, 'features)
 
   // use 2/3 of the data as a training set
   val irisTrain = iris.filter('id){id: Int => (id % 3) != 0}
@@ -24,16 +24,17 @@ class KnnExampleJob(args: Args) extends Job(args) {
     .discard('class)
 
   // prepare the model
-  val model = Knn.fit(irisTrain, 'point, 'class)
+  val model = Knn.fit(irisTrain, 'features, 'class)
   
   // apply the model
-  val predictions = Knn.classify(irisTest, model, 'point, 'id, k)(Distance.euclidean)
+  val predictions = Knn.classify(irisTest, model, 'features, 'id, k)(Distance.euclidean)
 
   // figure out how well we did
-  val output = predictions
-    .rename('class -> 'classPred)
-    .joinWithTiny('id -> 'id, iris)
-    .map('point -> ('sepalLength, 'sepalWidth)) {x: Point => (x.coord(0), x.coord(1))}
+  val output = iris
+    .leftJoinWithTiny('id -> 'id2, predictions.rename(('id, 'class) -> ('id2, 'classPred)))
+    .discard('id2)
+    .map('classPred -> 'classPred) {x: String => Option(x).getOrElse("")}
+    .map('features -> ('sepalLength, 'sepalWidth)) {x: Point => (x.coord(0), x.coord(1))}
     .project('id, 'class, 'classPred, 'sepalLength, 'sepalWidth)
     .write(Tsv("iris_pred.tsv"))
 

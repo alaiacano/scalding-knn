@@ -29,10 +29,11 @@ class KnnExampleJob(args: Args) extends Job(args) {
   val predictions = Knn.classify(irisTest, model, 'features, 'id, k)(Distance.euclidean)
 
   // figure out how well we did
-  val output = predictions
-    .rename('class -> 'classPred)
-    .joinWithTiny('id -> 'id, iris)
-    .map('point -> ('sepalLength, 'sepalWidth)) {x: Point => (x.coord(0), x.coord(1))}
+  val output = iris
+    .leftJoinWithTiny('id -> 'id2, predictions.rename(('id, 'class) -> ('id2, 'classPred)))
+    .discard('id2)
+    .map('classPred -> 'classPred) {x: String => Option(x).getOrElse("")}
+    .map('features -> ('sepalLength, 'sepalWidth)) {x: Point => (x.coord(0), x.coord(1))}
     .project('id, 'class, 'classPred, 'sepalLength, 'sepalWidth)
     .write(Tsv("iris_pred.tsv"))
 

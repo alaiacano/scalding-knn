@@ -1,4 +1,3 @@
-
 import com.twitter.scalding._
 import cascading.flow.FlowDef
 import cascading.pipe.Pipe
@@ -82,7 +81,7 @@ object Knn {
       .map(('__dataPoint, '__modelPoint) -> 'distance) {tup: (Point, Point) => distfn(tup._1, tup._2)}
 
       // get the K nearest neighbors to each point
-      .groupBy('id) {
+      .groupBy(idFields) {
         _.sortWithTake(('distance, '__modelClass) -> 'knn, k) {
           (t0 :(Double, String), t1:(Double, String)) => t0._1 < t1._1
         }

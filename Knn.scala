@@ -41,6 +41,7 @@ class KnnExampleJob(args: Args) extends Job(args) {
 
 
 object Knn {
+  import TDsl._
   import Dsl._
 
   /**
@@ -51,10 +52,10 @@ object Knn {
    *   val model = Knn.fit(trainingSet, ('feature1, 'feature2), 'label)
    * }}}
    */
-  def fit(trainingSet: Pipe, features: Fields, className: Fields)(implicit fd: FlowDef) : Pipe = {
+  def fit(trainingSet: Pipe, features: Fields, className: Fields)(implicit fd: FlowDef) : TypedPipe[(Point, String)] = {
     trainingSet
       .rename((features, className) -> ('__modelPoint, '__modelClass))
-      .project('__modelPoint, '__modelClass)
+      .toTypedPipe[(Point, String)]('__modelPoint, '__modelClass)
   }
 
   /**
@@ -67,7 +68,7 @@ object Knn {
    * @param k Number of neighbors to use in the classification (the "k" in "kNN")
    * @return A pipe with three fields: whatever you called `idFields`, `class` and `classCount`.
    */
-  def classify(data: Pipe, model: Pipe, featureField: Fields, idFields: Fields, k: Int)(distfn : (Point,Point) => Double )(implicit fd: FlowDef) = {
+  def classify(data: Pipe, model: TypedPipe[(Point, String)], featureField: Fields, idFields: Fields, k: Int)(distfn : (Point,Point) => Double )(implicit fd: FlowDef) = {
     val predictions = data
 
       // convert these features into a Point
@@ -75,7 +76,7 @@ object Knn {
       .project(Fields.join(idFields, '__dataPoint))
       
       // !!!!!!!!!!! DANGER !!!!!!!!!!!
-      .crossWithTiny(model)
+      .crossWithTiny(model.toPipe('__modelPoint, '__modelClass))
 
       // calculate distance
       .map(('__dataPoint, '__modelPoint) -> 'distance) {tup: (Point, Point) => distfn(tup._1, tup._2)}
